@@ -6,8 +6,6 @@ from plotly.subplots import make_subplots
 
 import time
 from dash.dependencies import Input, Output, State
-from io import BytesIO
-import base64
 import matplotlib.pyplot as plt
 from matplotlib.animation import FuncAnimation
 
@@ -16,9 +14,9 @@ from pyeit.mesh.meshpy.build import create
 from pyeit.eit.utils import eit_scan_lines
 import pyeit.eit.jac as jac
 from pyeit.eit.interp2d import sim2pts
-from pyeit.mesh.meshpy import shape
 
-from UIComponents import *
+from Components.tabs_component import *
+from Helpers.helpers import  *
 
 # Global variables
 dataSeries = None
@@ -28,33 +26,6 @@ solved = []
 
 app = dash.Dash( __name__ , external_stylesheets=[dbc.themes.FLATLY])
 
-def getShape(geometry):
-    if geometry == "throx":
-        return shape.throx
-    if geometry == "throx_anomaly":
-        return shape.throx_anomaly
-    if geometry == "disc":
-        return shape.disc
-    if geometry == "disc_anomaly":
-        return shape.disc_anomaly
-    if geometry == "anomaly_perm":
-        return shape.anomaly_perm
-
-def fig_to_uri(in_fig, close_all=True, **save_args):
-    # type: (plt.Figure) -> str
-    """
-    Save a figure as a URI
-    :param in_fig:
-    :return:
-    """
-    out_img = BytesIO()
-    in_fig.savefig(out_img, format='png', **save_args)
-    if close_all:
-        in_fig.clf()
-        plt.close('all')
-    out_img.seek(0)  # rewind file
-    encoded = base64.b64encode(out_img.read()).decode("ascii").replace("\n", "")
-    return "data:image/png;base64,{}".format(encoded)
 
 def plotAbsoluteImage(args_dict):
     # Grabbing parameters
@@ -184,9 +155,9 @@ def absolute_image_callback(*args):
     UpdateButton = dbc.Button("Update", id='absolute-update', className="mt-1", color="success")
     ConvergenceButton = dbc.Button("Show convergence", id="absolute-convergence",
                                        className="mt-1 ml-3",color="warning",disabled=False)
-    children = []
-    children.append(UpdateButton)
-    children.append(ConvergenceButton)
+    button_container = []
+    button_container.append(UpdateButton)
+    button_container.append(ConvergenceButton)
 
 
     # first render do nothing (n_clicks is None)
@@ -194,14 +165,12 @@ def absolute_image_callback(*args):
         return False, dbc.ModalBody(""), "", args_dict["update-button-absolute-container"]
 
     error_string = ValidateAbsoluteInputs(args_dict)
-    # error_string = None
-
     if error_string is None:
         AbsoluteImageFigure = plotAbsoluteImage(args_dict)
         out_url = fig_to_uri(AbsoluteImageFigure)
-        return False,dbc.ModalBody(""), out_url, children
+        return False,dbc.ModalBody(""), out_url, button_container
     else:
-        return True, dbc.ModalBody(error_string,style={"color": "#E74C3C"}), "", children
+        return True, dbc.ModalBody(error_string,style={"color": "#E74C3C"}), "", button_container
 
 
 @app.callback(
@@ -362,48 +331,7 @@ def raw_image_callback(n_clicks):
         return video_src
 
 
-def parse_npy_file(content,filename):
-    try:
-        content_type, content_string = content.split(',')
-        data_buffer = base64.b64decode(content_string)
-        if 'npy' in filename:
-            data = np.frombuffer(data_buffer, dtype=np.float64)
-            data = data[16:]
-            return data
-        else:
-            raise Exception("Not numpy file")
 
-    except Exception as e:
-        print(e)
-        return None
-
-def UploadStyleUpdate(data):
-    uploaded_style = {
-        'width': '100%',
-        'lineHeight': '60px',
-        'borderWidth': '1px',
-        'borderStyle': 'solid',
-        'backgroundColor': "#39DB80",
-        "color": "#FFFFFF",
-        'borderRadius': '5px',
-        'textAlign': 'center',
-    }
-    error_style = {
-                        'width': '100%',
-                        'lineHeight': '60px',
-                        'borderWidth': '1px',
-                        'borderStyle': 'solid',
-                        'backgroundColor':"#E74C3C",
-                        "color": "#FFFFFF",
-                        'borderRadius': '5px',
-                        'textAlign': 'center',
-                    }
-    uploaded_text = html.Div([html.A("Success! Click to re-upload file.")])
-    error_text = html.Div([html.A("Error parsing file. Try again")])
-    if data is None:
-        return error_text,error_style
-    else:
-        return uploaded_text,uploaded_style
 
 
 @app.callback(
@@ -423,6 +351,7 @@ def upload_data_series_callback(contents,filename):
             min=0,
             max=maximum,
             step=1,
+            value=0,
             id="absolute-slider",
             tooltip={"placement": "top"})
 
@@ -448,6 +377,8 @@ def upload_data_series_callback(contents,filename):
         slider = CreateCurrentSlider(dataSeries)
         rangeSlider= CreateRangeSlider(dataSeries)
         return text,style,slider,rangeSlider
+
+
 
 @app.callback(
     [Output('upload-reference-data','children'),
