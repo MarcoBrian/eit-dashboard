@@ -168,7 +168,7 @@ This may give a start on how to implement : https://dash.plotly.com/sharing-data
 
 This is a sketch draft of what might work. I have not truly implemented this because I did not have enough time. But try to see if this design might work or not. 
 
-
+![Cloud Architecture Design](https://github.com/MarcoBrian/eit-dashboard/blob/master/assets/cloud_draft.jpg)
 
 
 I got inspiration from : https://github.com/WileyIntelligentSolutions/wiley-dash-boilerplate2 . This example he used Celery to run long background processes locally.
