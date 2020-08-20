@@ -12,8 +12,8 @@ main_setting = dbc.Card(
             dbc.Select(
             id="select-geometry",
             options=[
-                {"label": "Throx", "value": "throx"},
-                {"label": "Throx Anomaly", "value": "throx_anomaly"},
+                {"label": "Thorax", "value": "throx"},
+                {"label": "Thorax Anomaly", "value": "throx_anomaly"},
                 {"label": "Disc", "value": "disc"},
                 {"label": "Disc Anomaly", "value": "disc_anomaly"},
                 {"label": "Anomaly Perm", "value": "anomaly_perm"}
@@ -81,11 +81,6 @@ main_setting = dbc.Card(
                         ],
                         value=[],
                         id="visual-checklist",
-                    ),
-                    dbc.Row(
-                        [dbc.Col(
-                            dbc.Button('Update Visuals', id="update-visuals", color="success",className="mt-3")
-                        )]
                     )
                 ]
             )),color="success",outline=True)
@@ -175,16 +170,17 @@ absolute_settings = dbc.Card(
 relative_settings = dbc.Card(
     dbc.CardBody([
         html.H2("Relative Dynamic Image settings"),
-        # dbc.FormGroup(
-        #     [
-        #         dbc.Label("Number of Frames "),
-        #         dbc.Input(
-        #             id="relative-num-frames",
-        #             placeholder="",
-        #             step="1",
-        #             type="number",
-        #             min=1)]
-        # ),
+        dbc.FormGroup(
+            [
+                dbc.Label("Number of Frames to average "),
+                dbc.Input(
+                    id="relative-num-frames",
+                    placeholder="",
+                    step="1",
+                    value=10,
+                    type="number",
+                    min=1)]
+        ),
         dbc.FormGroup(
             [
                 dbc.Label("Choose frame range to visualize", html_for="relative-range-slider"),
@@ -192,6 +188,18 @@ relative_settings = dbc.Card(
                          id="relative-range-slider-div", className="mt-2",)
             ]
         )
+        ,
+        dbc.FormGroup(
+            [
+                dbc.Label("VMin, VMax (Optional, abs value)"),
+                dbc.Input(
+                    id="vminmax",
+                    placeholder="",
+                    type="number",
+                    step="any",
+                    value=0.05,
+                    min=0
+                    )])
         ,
         dbc.FormGroup(
             [

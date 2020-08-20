@@ -1,8 +1,9 @@
 import dash
+from  flask import Flask, session
 import numpy as np
 from plotly import graph_objs as go
 from plotly.subplots import make_subplots
-
+import uuid
 
 import time
 from dash.dependencies import Input, Output, State
@@ -24,7 +25,9 @@ dataRef = None
 convergence_list = []
 solved = []
 
-app = dash.Dash( __name__ , external_stylesheets=[dbc.themes.FLATLY])
+server = Flask(__name__)
+server.secret_key = "hello"
+app = dash.Dash(server=server, external_stylesheets=[dbc.themes.FLATLY])
 
 
 def plotAbsoluteImage(args_dict):
@@ -108,22 +111,23 @@ def ValidateAbsoluteInputs(args_dict):
     return None
 
 def ValidateRelativeInputs(args_dict):
-    if dataRef is None:
-        return "Upload data reference from settings"
-
-    if dataSeries is None:
-        return "Upload data series from settings"
 
     if args_dict["select-geometry"] is None:
         return "Select a geometry in the settings"
 
+    if args_dict["relative-num-frames"] is None or args_dict["relative-num-frames"]  < 1:
+        return "Input valid number of frames to average in settings"
+
     if args_dict["number-electrodes"] is None or not isinstance(args_dict["number-electrodes"],int) :
         return "Input valid number of electrodes in settings"
+
+    if args_dict["vminmax"] is None or args_dict["vminmax"] < 0 :
+        return "Input valid number for Vmin Vmax"
 
     if args_dict["relative-lambda"] is None:
         return "Input valid lambda"
 
-
+    return None
 
 absolute_inputs = [
         Input(component_id='absolute-update',component_property='n_clicks')
@@ -190,7 +194,9 @@ def hide_absolute_update_button(n_clicks):
 def createRelativeImage(args_dict):
     '''Setup for inverse problem'''
     num_eit = args_dict["number-electrodes"]
+    window = args_dict["relative-num-frames"]
     curve = getShape(args_dict["select-geometry"])
+    vminmax = args_dict["vminmax"]
     lambda_parameter = args_dict["relative-lambda"]
     start_frame, end_frame = args_dict["relative-range-slider"]
     print(start_frame)
@@ -211,22 +217,25 @@ def createRelativeImage(args_dict):
     '''Reconstruct a relative image'''
 
     eit.setup(p=0.35, lamb=lambda_parameter, method='kotre')
+    global solved
     solved = []
     start = time.time()
-    for i in range(start_frame,end_frame):
-        condTG = eit.solve(dataSeries[i], dataRef, normalize=False)
+    selected_dataSeries = dataSeries[start_frame:end_frame + 1,:]
+    averaged_dataSeries = []
+
+    frames = end_frame - start_frame + 1
+    movingAverageLoop = frames - window + 1
+    for i in range(movingAverageLoop):
+        average = np.mean(selected_dataSeries[i:i+window,:],axis=0)
+        averaged_dataSeries.append(average)
+
+    print(type(averaged_dataSeries))
+
+    for i in range(len(averaged_dataSeries)):
+        condTG = eit.solve(averaged_dataSeries[i], dataRef, normalize=False)
         condNTG = sim2pts(pts, tri, np.real(condTG))
         solved.append(condNTG)
     solved = np.array(solved)
-    v_min = abs(np.min(solved))
-    v_max = abs(np.max(solved))
-    v_minmax = max(v_min,v_max)
-    print(v_min)
-    print(v_max)
-    v_min = v_minmax*-1
-    v_max = v_minmax
-    print("new:", v_min)
-    print(v_max)
 
     print(solved.shape)
     end = time.time()
@@ -236,7 +245,13 @@ def createRelativeImage(args_dict):
     plt.jet()
 
     ax3 = fig.add_subplot(1, 1, 1)
-    im3 = ax3.tripcolor(x, y, tri, np.real(solved[0]), shading='gouraud')
+
+    if vminmax is None:
+        im3 = ax3.tripcolor(x, y, tri, np.real(solved[0]), shading='gouraud')
+    else:
+        im3 = ax3.tripcolor(x, y, tri, np.real(solved[0]), vmin=vminmax*-1, vmax=vminmax ,shading='gouraud')
+
+
     cb3 = plt.colorbar(im3, ax=ax3)
     ax3.set_aspect('equal')
     ax3.set_title('Reconstructed image')
@@ -253,7 +268,7 @@ def createRelativeImage(args_dict):
         return im3,
 
 
-    anim = FuncAnimation(fig, update_trip, init_func=init, frames=range(start_frame,end_frame), interval=100, repeat=False, blit=True)
+    anim = FuncAnimation(fig, update_trip, init_func=init, frames=range(len(averaged_dataSeries)), interval=100, repeat=False, blit=True)
 
     start = time.time()
     video_embed_str = anim.to_html5_video()
@@ -272,7 +287,9 @@ def createRelativeImage(args_dict):
 relative_inputs = [Input(component_id='relative-update',component_property='n_clicks')]
 relative_states = [ State(component_id='select-geometry',component_property='value'),
                     State(component_id='number-electrodes',component_property='value'),
+                    State(component_id='relative-num-frames', component_property='value'),
                     State(component_id='relative-range-slider',component_property='value'),
+                    State(component_id='vminmax', component_property='value'),
                     State(component_id='relative-lambda',component_property='value')]
 @app.callback(
     Output("relative-video","src"),
@@ -284,9 +301,13 @@ def relative_image_callback(*args):
     args_dict = dict(zip(input_names, args))
 
     if args_dict["relative-update"] is not None:
-        video_embed_str = createRelativeImage(args_dict)
-        print(video_embed_str)
-        return video_embed_str
+        errorstring = ValidateRelativeInputs(args_dict)
+        if errorstring is None:
+            video_embed_str = createRelativeImage(args_dict)
+            print(video_embed_str)
+            return video_embed_str
+        else:
+            return ""
 
 
 
@@ -344,35 +365,53 @@ def raw_image_callback(n_clicks):
 )
 def upload_data_series_callback(contents,filename):
     def CreateCurrentSlider(dataSeries):
-        print(type(dataSeries))
-        data_shape = dataSeries.shape
-        maximum = data_shape[0]
-        return dcc.Slider(
-            min=0,
-            max=maximum,
-            step=1,
-            value=0,
-            id="absolute-slider",
-            tooltip={"placement": "top"})
+        if dataSeries is not None:
+            data_shape = dataSeries.shape
+            maximum = data_shape[0]
+            return dcc.Slider(
+                min=0,
+                max=maximum,
+                step=1,
+                value=0,
+                id="absolute-slider",
+                tooltip={"placement": "top"})
+        else:
+            return dcc.Slider(disabled=True)
 
     def CreateRangeSlider(dataSeries):
-        data_shape = dataSeries.shape
-        maximum = data_shape[0]
-        return dcc.RangeSlider(
-            min=0,
-            max=maximum,
-            step=1,
-            id="relative-range-slider",
-            value=[0,maximum],
-            tooltip={"placement": "top"}
-        )
+        if dataSeries is not None:
+            data_shape = dataSeries.shape
+            maximum = data_shape[0]
+            return dcc.RangeSlider(
+                min=0,
+                max=maximum,
+                step=1,
+                id="relative-range-slider",
+                value=[0,maximum],
+                tooltip={"placement": "top"}
+            )
+        else:
+            return dcc.RangeSlider(disabled=True)
 
-
+    global dataSeries
     if filename is not None:
-        global dataSeries
         dataSeries = parse_npy_file(contents,filename)
-        print(len(dataSeries))
-        dataSeries = np.reshape(dataSeries,(-1,208))
+        try:
+            dataSeries = np.reshape(dataSeries,(-1,208))
+            text, style = UploadStyleUpdate(dataSeries)
+            slider = CreateCurrentSlider(dataSeries)
+            rangeSlider = CreateRangeSlider(dataSeries)
+            return text, style, slider, rangeSlider
+
+        except Exception as e:
+            dataSeries = None
+            text, style = UploadStyleUpdate(dataSeries)
+            slider = CreateCurrentSlider(dataSeries)
+            rangeSlider = CreateRangeSlider(dataSeries)
+            return text,style,slider,rangeSlider
+
+
+    if dataSeries is not None:
         text,style = UploadStyleUpdate(dataSeries)
         slider = CreateCurrentSlider(dataSeries)
         rangeSlider= CreateRangeSlider(dataSeries)
@@ -387,11 +426,17 @@ def upload_data_series_callback(contents,filename):
     [State('upload-reference-data', 'filename')]
 )
 def upload_data_reference_callback(contents,filename):
+    global dataRef
     if filename is not None:
-        global dataRef
         dataRef = parse_npy_file(contents,filename)
-        print(dataRef.shape)
+        # Not valid reference file
+        if (dataRef is None or len(dataRef) > 208):
+            dataRef = None
+            return UploadStyleUpdate(dataRef)
+        else:
+            return UploadStyleUpdate(dataRef)
 
+    if dataRef is not None:
         return UploadStyleUpdate(dataRef)
 
 
@@ -420,15 +465,16 @@ def upload_prior_info_absolute_callback(contents,filename):
 
 
 
-
+# This callback is called to show ROI and triggered by the Show ROI button
 @app.callback(
     [Output(component_id='show-roi-modal', component_property='is_open'),
      Output(component_id='show-roi-modal', component_property='children')],
     [Input(component_id='show-roi', component_property='n_clicks')],
     [State(component_id='number-electrodes',component_property='value'),
-     State(component_id='select-geometry',component_property='value')]
+     State(component_id='select-geometry',component_property='value'),
+     State(component_id='relative-num-frames',component_property='value')]
 )
-def ShowROI(n_clicks, electrodes, geometry):
+def ShowROI(n_clicks, electrodes, geometry, window):
     def SetROIs(mesh, type='quadrants', constraint=True):
         pts = mesh['node']
         x = pts[:, 0]
@@ -453,21 +499,13 @@ def ShowROI(n_clicks, electrodes, geometry):
 
         return ROI_TF
 
-    def movingAve(values, window):
-        weights = np.repeat(1.0, window) / window
-        smas = np.convolve(values, weights, 'valid')
-        return smas
-
     def CreateROIGraph():
-        import pickle
-        pickle.load(open('solved.pickle','rb'))
         num_eit = electrodes
         curve = getShape(geometry)
-        mesh_obj, el_pos = create(num_eit)
+        mesh_obj, el_pos = create(num_eit,curve=curve)
         ROI = SetROIs(mesh_obj, type='quadrants')
 
-        solved = pickle.load(open('solved.pickle', 'rb'))
-        solved = np.array(solved)
+        global solved
         quadrants = []
         for index_array in ROI:
             temp = solved[:, index_array]
@@ -476,7 +514,7 @@ def ShowROI(n_clicks, electrodes, geometry):
 
         moving = []
         for quads in quadrants:
-            moving.append(movingAve(quads, 10))
+            moving.append(movingAve(quads, window))
 
         fig = make_subplots(rows=2, cols=2)
         fig.append_trace(go.Scatter(
@@ -518,11 +556,12 @@ def ShowROI(n_clicks, electrodes, geometry):
         fig.update_layout(height=500, width=1000, title_text="Quadrants ROI")
         graph_object = dcc.Graph(figure=fig)
         return dbc.ModalBody(children=[graph_object])
+
     if n_clicks is not None:
         return True, CreateROIGraph()
 
 
-# display convergence graph callback
+# Display convergence graph callback, triggered by Show convergence button
 @app.callback(
     [Output(component_id='convergence-modal', component_property='is_open'),
     Output(component_id='convergence-modal', component_property='children')],
@@ -543,12 +582,13 @@ def ShowConvergence(n_clicks):
         return True, CreateConvergenceGraph()
 
 
+
+# Callback used to control what to be displayed in the visualization tabs
 @app.callback(
     Output(component_id='visual-content', component_property='children'),
-    [Input(component_id='update-visuals',component_property='n_clicks')],
-    [State(component_id='visual-checklist',component_property='value')]
+    [Input(component_id='visual-checklist',component_property='value')]
 )
-def VisualControlsCallback(n_clicks,visual_array):
+def VisualControlsCallback(visual_array):
     def generateVisuals(visual_array):
         children = []
         # add  children
@@ -564,17 +604,18 @@ def VisualControlsCallback(n_clicks,visual_array):
             children.append(new_child)
 
         return children
-
-    if n_clicks is not None:
-        children = generateVisuals(visual_array)
-        return children
-    else:
-        return []
+    children = generateVisuals(visual_array)
+    return children
 
 
-app.layout = html.Div([
-    navbar , tabs
-], id="main-div")
+
+def serve_layout():
+    session_id = str(uuid.uuid4())
+    print(session_id)
+    return html.Div([
+    navbar , tabs, html.Div(session_id,id='session-id',style={'display':'none'})], id="main-div")
+
+app.layout = serve_layout
 
 if __name__ == "__main__":
     app.run_server(threaded=True)

@@ -50,3 +50,7 @@ def fig_to_uri(in_fig, close_all=True, **save_args):
     encoded = base64.b64encode(out_img.read()).decode("ascii").replace("\n", "")
     return "data:image/png;base64,{}".format(encoded)
 
+def movingAve(values, window):
+    weights = np.repeat(1.0, window) / window
+    smas = np.convolve(values, weights, 'valid')
+    return smas
