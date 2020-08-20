@@ -4,6 +4,9 @@ This web application is made by using the Dash web framework from Plotly.
 
 The full documentation can be found in https://dash.plotly.com/ .
 
+[Branch containing code for GCP and Firestore](https://github.com/MarcoBrian/eit-dashboard/tree/cloud_integration/gense_gcp)
+
+
 # Project Structure
 
 * **/assets** - This is a directory to hold assets for the application. You can find CSS file here to change the design of the application. 
