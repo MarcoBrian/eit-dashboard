@@ -1,21 +1,21 @@
 # Table of Contents
 
-- [EIT Dashboard (Introduction)](#eit-dashboard)
+- [EIT Dashboard (Introduction)](#eit-dashboard--introduction-)
 - [Project Structure](#project-structure)
   * [Components Folder](#components-folder)
 - [Running the application](#running-the-application)
-- [Registering Callbacks](#registering-callbacks)
+- [Registering Callback Functions](#registering-callback-functions)
     + [Input](#input)
     + [State](#state)
     + [Output](#output)
     + [Callback function's *args](#callback-function-s--args)
     + [Storing parameters into dictionary](#storing-parameters-into-dictionary)
-    + [Full Code Snippet](#full-code-snippet)
+    + [Example Callback (Code Snippet)](#example-callback--code-snippet-)
+- [Small change in pyEIT library](#small-change-in-pyeit-library)
 - [Next Steps / Improvements to be made](#next-steps---improvements-to-be-made)
   * [Multi User Sessions](#multi-user-sessions)
   * [Integration with Google Cloud](#integration-with-google-cloud)
 - [References](#references)
-
 
 # EIT Dashboard (Introduction)
 
@@ -54,9 +54,11 @@ Run application locally
 
 `python app.py`
 
-The application will be served in http://127.0.0.1:8050/
+The application will be served in http://127.0.0.1:8050/ in the local machine.
 
-# Registering Callbacks
+# Registering Callback Functions
+
+Most of the funtionality of the application resolves around registering a callback function to a Button or Input component. So getting to understand how to register callback functions to a UI component will be very important.  
 
 For more information on registering callbacks please visit: https://dash.plotly.com/basic-callbacks .
 
@@ -142,7 +144,7 @@ I then use the args argument and put all the argument into a dictionary where so
 ```
 
 
-### Full Code Snippet 
+### Example Callback (Code Snippet) 
 
 ```python
 
@@ -172,13 +174,39 @@ def absolute_image_callback(*args):
 ```
 
 
+
+
+
+
+
+
+
+# Small change in pyEIT library
+
+I have made a small change inside the pyEIT library in the **gn()** function of **JAC(EITbase)** class, which allows to return back the gtol array. I added a new optional flag named **converge_info** which is set to False by default. When the **converge_info** flag is set to True, it will return an additional array which contains the gtol value at each iteration. 
+
+```python
+
+    # previously 
+    ds1 = eit.gn(mean_data, lamb_decay=0.1, lamb_min=1e-5, maxiter=max_iterations, verbose=True)
+
+
+    # new change allows this but keeps previous function working too
+    ds1, convergence_list = eit.gn(mean_data, lamb_decay=0.1, lamb_min=1e-5, maxiter=max_iterations, verbose=True,converge_info=True)
+
+    # convergence_list contains the gtol values at each iteration
+
+```
+
+
+
 # Next Steps / Improvements to be made
 
 ## Multi User Sessions
 
 Because currently the application is running locally, the usage of global variables will not be a problem. But when you host this and multiple users are using the web application, then if a user access a global variable this will cause the change of state of the other users. 
 
-**IMPORTANT** : *Current version is still using global variables so it is not well suited for multi users. Must take into consideration of the global variables or else application will break. *
+**IMPORTANT** : *Current version is still using global variables so it is not well suited for multi users. Must take into consideration of the global variables or else application will break or not behaving how you expect.*
 
 For this not to happen we need to separately identify memory with session-ids. Only a person with the correct session-id can access his part of memory. 
 
@@ -194,6 +222,8 @@ This is a sketch draft of what might work. I have not truly implemented this bec
 
 
 I got inspiration from : https://github.com/WileyIntelligentSolutions/wiley-dash-boilerplate2 . This example he used Celery to run long background processes locally.
+
+
 
 
 # References
