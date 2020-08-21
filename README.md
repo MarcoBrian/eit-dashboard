@@ -1,4 +1,23 @@
-# EIT Dashboard
+# Table of Contents
+
+- [EIT Dashboard (Introduction)](#eit-dashboard)
+- [Project Structure](#project-structure)
+  * [Components Folder](#components-folder)
+- [Running the application](#running-the-application)
+- [Registering Callbacks](#registering-callbacks)
+    + [Input](#input)
+    + [State](#state)
+    + [Output](#output)
+    + [Callback function's *args](#callback-function-s--args)
+    + [Storing parameters into dictionary](#storing-parameters-into-dictionary)
+    + [Full Code Snippet](#full-code-snippet)
+- [Next Steps / Improvements to be made](#next-steps---improvements-to-be-made)
+  * [Multi User Sessions](#multi-user-sessions)
+  * [Integration with Google Cloud](#integration-with-google-cloud)
+- [References](#references)
+
+
+# EIT Dashboard (Introduction)
 
 This web application is made by using the Dash web framework from Plotly.
 
