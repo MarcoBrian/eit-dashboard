@@ -198,6 +198,8 @@ I have made a small change inside the pyEIT library in the **gn()** function of 
 
 ```
 
+The array is used for displaying the convergence graph in the application.
+
 
 
 # Next Steps / Improvements to be made
@@ -223,7 +225,20 @@ This is a sketch draft of what might work. I have not truly implemented this bec
 
 I got inspiration from : https://github.com/WileyIntelligentSolutions/wiley-dash-boilerplate2 . This example he used Celery to run long background processes locally.
 
+### Steps (subject to change)
 
+1. The numpy files are uploaded and stored in memory. 
+
+2. The numpy files proceed to be stored in the firestore database. Which it identified by a unique generated session id by the application. 
+
+3. Multiple things will happen here. **3.1** When a user clicks a triggering button, a callback function will be called and a task to compute the image is created.
+ **3.2** At the same time, the callback will also trigger a dcc.Interval component that will keep fetching firestore for updates at a timely interval. Usually this dcc.Interval will be off and not doing anything, only when a task has been created it will be activated. 
+
+4. The task is finally sent to the Google App Engine (sent through HTTP Endpoint) after being in the queue.
+
+5. The server running in Google App Engine will receive the task. Look at the information inside the task (session_id, parameters, etc). Then continue to compute what is instructed by the task. Then store the results in Firestore. 
+
+6. The dcc.interval sees that the data is ready to be fetched and fetches the data from firestore. Which will triggers a callback function to display the results. 
 
 
 # References
